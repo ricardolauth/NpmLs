@@ -8,18 +8,18 @@ using Semver;
 
 namespace NpmLs
 {
-    public class Function1
+    public class NpmLs
     {
-        private readonly ILogger<Function1> _logger;
+        private readonly ILogger<NpmLs> _logger;
         private static readonly HttpClient HttpClient = new HttpClient();
         private const string RegistryUrl = "https://registry.npmjs.org";
 
-        public Function1(ILogger<Function1> logger)
+        public NpmLs(ILogger<NpmLs> logger)
         {
             _logger = logger;
         }
 
-        [Function("Function1")]
+        [Function("npm-ls")]
         public async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
             ILogger log)
@@ -132,7 +132,7 @@ namespace NpmLs
         private static void WalkDependenciesAsync(TaskItem task, Package packageJson, LsOptions options)
         {
             var version = GuessVersion(task.Version, packageJson);
-            var dependencies = packageJson.Versions[version].Dependencies ?? new Dictionary<string, string>();
+            var dependencies = packageJson.Versions[version].Dependencies ?? [];
             var id = $"{packageJson.Name}@{version}";
             if (task.ParentNode != null)
             {
@@ -146,7 +146,7 @@ namespace NpmLs
             }
 
             task.Nodes.Add(id);
-            task.Flat.Add(ToMetadata(packageJson, version));
+            task.Flat.Add(ToMetadata(packageJson, packageJson.Versions[version]));
 
             foreach (var dep in dependencies)
             {
@@ -174,7 +174,7 @@ namespace NpmLs
 
             if (version == null && versionString == "*" && availableVersions.All(av => SemVersion.Parse(av).Prerelease != null))
             {
-                version = packageJson.DistTags.ContainsKey("latest") ? packageJson.DistTags["latest"] : null;
+                version = packageJson.DistTags.Latest;
             }
 
             if (version == null)
@@ -185,14 +185,22 @@ namespace NpmLs
             return version;
         }
 
-        private static Metadata ToMetadata(Package packageJson, string version)
+        private static Metadata ToMetadata(Package packageJson, PackageVersion version)
         {
             return new Metadata
             {
                 Id = $"{packageJson.Name}@{version}",
-                Version = version,
+                Version = version.Version,
                 Name = packageJson.Name,
-                Description = packageJson.Description
+                Description = packageJson.Description,
+                Deprecated = version.Deprecated,
+                DistTags = packageJson.DistTags,
+                Keywords = packageJson.Keywords,
+                License = packageJson.License,
+                Maintainers = packageJson.Maintainers,
+                Repository = packageJson.Repository,
+                Homepage = packageJson.Homepage,
+                Time = packageJson.Time            
             };
         }
     }
@@ -209,26 +217,6 @@ namespace NpmLs
         public ConcurrentBag<Metadata> Flat { get; set; }
     }
 
-    public class Package
-    {
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public Dictionary<string, PackageVersion> Versions { get; set; }
-        public Dictionary<string, string> DistTags { get; set; }
-    }
-
-    public class PackageVersion
-    {
-        public Dictionary<string, string> Dependencies { get; set; }
-    }
-
-    public class Metadata
-    {
-        public string Id { get; set; }
-        public string Version { get; set; }
-        public string Name { get; set; }
-        public string Description { get; set; }
-    }
 
     public class SemverComparer : IComparer<SemVersion>
     {
@@ -251,15 +239,99 @@ namespace NpmLs
 
             return maxVersion?.Max(new SemverComparer())?.ToString();
         }
-
-        public static IEnumerable<Metadata> DistinctByKey(this ConcurrentBag<Metadata> list, string key)
-        {
-            return list.GroupBy(m => m.Id).Select(g => g.First());
-        }
-
-        public static IEnumerable<List<string>> DistinctFlat(this ConcurrentBag<List<string>> list)
-        {
-            return list.SelectMany(cycle => cycle).Distinct().Select(item => new List<string> { item });
-        }
     }
+
+
+
+    public class Package
+    {
+        public string Id { get; set; }
+        public string Rev { get; set; }
+        public string Name { get; set; }
+        public DistTags DistTags { get; set; }
+        public Dictionary<string, PackageVersion> Versions { get; set; }
+        public Dictionary<string, DateTime> Time { get; set; }
+        public Bugs Bugs { get; set; }
+        public string License { get; set; }
+        public string Homepage { get; set; }
+        public List<string> Keywords { get; set; }
+        public Repository Repository { get; set; }
+        public string Description { get; set; }
+        public List<Maintainer> Maintainers { get; set; }
+        public string Readme { get; set; }
+        public string ReadmeFilename { get; set; }
+        public Dictionary<string, bool> Users { get; set; }
+    }
+
+    public class PackageVersion
+    {
+        public string Name { get; set; }
+        public string Version { get; set; }
+        public Maintainer Author { get; set; }
+        public string Id { get; set; }
+        public List<Maintainer> Maintainers { get; set; }
+        public Bugs Bugs { get; set; }
+        public Maintainer NpmUser { get; set; }
+        public List<string> Licenses { get; set; }
+        public Repository Repository { get; set; }
+        public string NpmVersion { get; set; }
+        public string Description { get; set; }
+        public string NodeVersion { get; set; }
+        public Dictionary<string, string> Dependencies { get; set; }
+        public Dictionary<string, string> DevDependencies { get; set; }
+        public Dictionary<string, string> PeerDependencies { get; set; }
+        public List<string> Keywords { get; set; }
+        public object Deprecated { get; set; }
+        public string Homepage { get; set; }
+        public string? License { get; set; }
+        public bool? BundleDependencies { get; set; }
+        public string GitHead { get; set; }
+    }
+
+    public class Bugs
+    {
+        public string Url { get; set; }
+    }
+
+    public class DistTags
+    {
+        public string Latest { get; set; }
+        public string Beta { get; set; }
+        public string Experimental { get; set; }
+        public string Rc { get; set; }
+        public string Next { get; set; }
+        public string Canary { get; set; }
+    }
+
+    public class Maintainer
+    {
+        public string Name { get; set; }
+        public string Email { get; set; }
+    }
+
+    public class Repository
+    {
+        public string Url { get; set; }
+        public string Type { get; set; }
+        public string Directory { get; set; }
+    }
+
+    public class Metadata
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Version { get; set; }
+        public string Description { get; set; }
+        public List<Maintainer> Maintainers { get; set; }
+        public Repository Repository { get; set; }
+        public List<string> Keywords { get; set; }
+        public string Homepage { get; set; }
+        public object Deprecated { get; set; }
+        public string? License { get; set; }
+        public DistTags DistTags { get; set; }
+        public Dictionary<string, string> PeerDependencies { get; set; }
+        public Dictionary<string, DateTime> Time { get; set; }
+    }
+
+
 }
