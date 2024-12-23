@@ -200,12 +200,10 @@ namespace NpmLs
                 Maintainers = packageJson.Maintainers,
                 Repository = packageJson.Repository,
                 Homepage = packageJson.Homepage,
-                Time = packageJson.Time            
+                Time = packageJson.Time
             };
         }
     }
-
-
 
     public class TaskItem
     {
@@ -216,7 +214,6 @@ namespace NpmLs
         public ConcurrentBag<string> Edges { get; set; }
         public ConcurrentBag<Metadata> Flat { get; set; }
     }
-
 
     public class SemverComparer : IComparer<SemVersion>
     {
@@ -240,8 +237,6 @@ namespace NpmLs
             return maxVersion?.Max(new SemverComparer())?.ToString();
         }
     }
-
-
 
     public class Package
     {
@@ -332,6 +327,4 @@ namespace NpmLs
         public Dictionary<string, string> PeerDependencies { get; set; }
         public Dictionary<string, DateTime> Time { get; set; }
     }
-
-
 }
